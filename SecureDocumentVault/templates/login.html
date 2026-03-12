@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - TV Security Vault</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Heart Animation */
+        .heart-active {
+            color: red !important;
+            transform: scale(1.2);
+            transition: all 0.3s ease;
+        }
+        /* Modal Background */
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen">
+
+    <div class="bg-white p-8 rounded-xl shadow-2xl w-96 relative border-t-4 border-blue-600">
+        <button onclick="toggleModal(true)" class="absolute -top-10 right-0 text-blue-600 font-bold hover:underline flex items-center">
+            <span class="mr-1">ℹ️</span> About Developer
+        </button>
+
+        <h2 class="text-3xl font-extrabold mb-6 text-center text-blue-600 tracking-tight">TV Security Vault</h2>
+        
+        <form method="POST">
+            <div class="mb-4">
+                <label class="block text-gray-700 font-semibold mb-1">Username</label>
+                <input type="text" name="username" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 transition shadow-sm" placeholder="Enter username" required>
+            </div>
+            <div class="mb-6">
+                <label class="block text-gray-700 font-semibold mb-1">Password</label>
+                <input type="password" name="password" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 transition shadow-sm" placeholder="••••••••" required>
+            </div>
+            <button type="submit" class="w-full bg-blue-600 text-white py-2.5 rounded-lg font-bold hover:bg-blue-700 transform active:scale-95 transition duration-200 shadow-md">
+                Login to Vault
+            </button>
+        </form>
+
+        <div class="mt-6 flex justify-between items-center border-t pt-4">
+            <p class="text-sm text-gray-600">
+                New? <a href="/register" class="text-blue-500 font-bold hover:underline">Register</a>
+            </p>
+            
+            <div class="flex items-center space-x-2">
+                <button id="likeBtn" onclick="handleLike()" class="focus:outline-none text-2xl">
+                    <span id="heartIcon" class="text-black transition duration-300">♡</span>
+                </button>
+                <span id="likeCount" class="font-bold text-gray-700">0</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="devModal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg p-6 max-w-sm w-full shadow-2xl transform transition-all text-center">
+            <h3 class="text-xl font-bold text-blue-600 mb-2">Developer Profile</h3>
+            <hr class="mb-4">
+            <p class="text-gray-800 text-lg font-semibold">Tirumareddy Ramu</p>
+            <p class="text-gray-500 text-sm">Frontend Developer & B.Sc CS Student</p>
+            <button onclick="toggleModal(false)" class="mt-6 bg-gray-800 text-white px-6 py-2 rounded-full hover:bg-black transition">Close</button>
+        </div>
+    </div>
+
+    <script>
+        // Modal Logic
+        function toggleModal(show) {
+            const modal = document.getElementById('devModal');
+            if (show) {
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        // Like Counter Logic (Instagram Style)
+        let count = 0;
+        let liked = false;
+
+        function handleLike() {
+            const heart = document.getElementById('heartIcon');
+            const counter = document.getElementById('likeCount');
+
+            if (!liked) {
+                count++;
+                heart.innerHTML = "❤️"; // Filled heart
+                heart.classList.add('heart-active');
+                liked = true;
+            } else {
+                count--;
+                heart.innerHTML = "♡"; // Outline heart
+                heart.classList.remove('heart-active');
+                liked = false;
+            }
+            counter.innerText = count;
+        }
+    </script>
+</body>
+</html>

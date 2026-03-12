@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - TV Security</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <nav class="bg-blue-600 p-4 text-white shadow-md flex justify-between items-center">
+        <h1 class="text-xl font-bold tracking-tight">TV Security Vault</h1>
+        <div class="flex items-center">
+            <span class="mr-4 text-sm md:text-base">Welcome, <b class="capitalize">{{ session['user'] }}</b></span>
+            <a href="/logout" class="bg-red-500 px-4 py-2 rounded text-sm font-bold hover:bg-red-600 transition duration-200">Logout</a>
+        </div>
+    </nav>
+
+    <div class="max-w-4xl mx-auto p-4 md:p-8">
+        <div class="bg-white p-6 rounded-lg shadow-lg mb-8 border-t-4 border-blue-500">
+            <h3 class="text-lg font-bold mb-4 text-gray-700">Upload New Document</h3>
+            <form action="/dashboard" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-4 gap-4 italic">
+                <input type="text" name="docname" placeholder="Document Tag/Name" class="border p-2 rounded focus:ring-2 focus:ring-blue-400 outline-none transition" required>
+                <input type="password" name="docpass" placeholder="Set File Password" class="border p-2 rounded focus:ring-2 focus:ring-blue-400 outline-none transition" required>
+                <input type="file" name="file" class="border p-1 rounded bg-gray-50 text-sm" required>
+                <button type="submit" class="bg-blue-600 text-white rounded font-bold hover:bg-blue-700 transition transform active:scale-95 py-2">Upload</button>
+            </form>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-lg">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold text-gray-700">My Protected Documents</h3>
+                <span class="bg-blue-100 text-blue-600 text-xs font-bold px-2.5 py-0.5 rounded-full uppercase">Secure Storage</span>
+            </div>
+            
+            <div class="space-y-4">
+                {% for doc in docs %}
+                <div class="border p-4 rounded-lg hover:bg-gray-50 transition shadow-sm border-l-4 border-green-400 bg-white">
+                    <div class="flex flex-col md:flex-row md:justify-between md:items-center space-y-3 md:space-y-0">
+                        <div class="flex flex-col">
+                            <span class="text-[10px] text-blue-500 font-bold uppercase tracking-widest">Filename:</span>
+                            <span class="font-bold text-gray-800 text-base break-all uppercase">{{ doc[3] }}</span>
+                            <span class="text-xs text-gray-400 mt-0.5 italic">Tag: {{ doc[2] }}</span>
+                        </div>
+                        
+                        <div class="flex items-center space-x-2">
+                            <input type="password" id="pass-{{ doc[0] }}" placeholder="Password" class="border p-1.5 text-sm rounded w-28 md:w-32 outline-none focus:border-blue-500 transition shadow-inner">
+                            <button onclick="checkDoc('{{ doc[0] }}')" class="bg-green-500 text-white px-4 py-1.5 rounded text-sm font-bold hover:bg-green-600 transition shadow-sm active:bg-green-700">View</button>
+                            
+                            <button onclick="confirmDelete('{{ doc[0] }}')" class="text-red-500 hover:text-red-700 text-xs font-bold uppercase tracking-tighter p-1 ml-2 transition">Delete</button>
+                        </div>
+                    </div>
+
+                    <div id="preview-{{ doc[0] }}" class="mt-4 hidden border-t border-dashed pt-4 text-center bg-gray-100 rounded-b-lg p-4 transition-all duration-300">
+                        <p class="text-[10px] text-green-600 font-bold uppercase mb-3">✓ Decryption Successful</p>
+                        </div>
+                </div>
+                {% else %}
+                <div class="text-center py-10 border-2 border-dashed border-gray-200 rounded-lg">
+                    <p class="text-gray-400">No documents found. Start by uploading one!</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <footer class="text-center mt-12 pb-6 text-gray-400 text-xs">
+        &copy; 2026 TV Security Vault - Secure File Management System
+    </footer>
+
+    <script>
+    // Delete Confirmation Logic
+    function confirmDelete(docId) {
+        if (confirm("Are you sure? This document will be permanently deleted from the vault!")) {
+            window.location.href = "/delete/" + docId;
+        }
+    }
+
+    // Document Verification and Preview Logic
+    function checkDoc(id) {
+        const passInput = document.getElementById('pass-' + id);
+        let pass = passInput.value;
+        
+        if (!pass) {
+            alert("Security Alert: Please enter the document password to view.");
+            passInput.focus();
+            return;
+        }
+
+        let formData = new FormData();
+        formData.append('docid', id);
+        formData.append('password', pass);
+
+        fetch('/check_password', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.status === 'success') {
+                let previewDiv = document.getElementById('preview-' + id);
+                previewDiv.classList.remove('hidden');
+                
+                // Constructing the decrypted preview UI
+                previewDiv.innerHTML = `
+                    <div class="p-3 inline-block bg-white shadow-lg rounded-lg border">
+                        <img src="/static/uploads/${data.file}" class="mx-auto rounded shadow-md max-w-full md:max-w-sm mt-2 border border-gray-100 animate-pulse-once">
+                        <div class="mt-4 flex justify-center items-center space-x-4">
+                            <a href="/view/${data.file}" class="text-blue-600 hover:text-blue-800 text-sm font-bold flex items-center">
+                                <span class="mr-1">🔗</span> Open Full Screen
+                            </a>
+                            <span class="text-gray-300">|</span>
+                            <a href="/download/${data.file}" class="text-green-600 hover:text-green-800 text-sm font-bold flex items-center">
+                                <span class="mr-1">⬇</span> Download
+                            </a>
+                        </div>
+                    </div>
+                `;
+            } else {
+                alert('Access Denied: Incorrect Password! Please try again.');
+                passInput.value = '';
+                passInput.focus();
+            }
+        })
+        .catch(err => {
+            console.error("Critical Error:", err);
+            alert("Network Error: Could not reach the security server.");
+        });
+    }
+    </script>
+
+    <style>
+        @keyframes pulse-once {
+            0% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .animate-pulse-once {
+            animation: pulse-once 0.5s ease-out;
+        }
+    </style>
+</body>
+</html>

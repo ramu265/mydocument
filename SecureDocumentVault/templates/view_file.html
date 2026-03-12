@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>View Document</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-black flex flex-col items-center justify-center h-screen text-white">
+    <div class="mb-4">
+        <a href="/dashboard" class="bg-gray-700 px-4 py-2 rounded">Back to Dashboard</a>
+        <a href="/download/{{ file }}" class="bg-green-600 px-4 py-2 rounded ml-2">Download File</a>
+    </div>
+    <div class="bg-white p-2 rounded shadow-lg max-w-4xl max-h-[80vh] overflow-auto">
+        <img src="{{ url_for('static', filename='uploads/' + file) }}" class="max-w-full">
+    </div>
+</body>
+</html>
