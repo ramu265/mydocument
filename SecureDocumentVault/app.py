@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, session, jsonify, send_from_directory
+from flask import Flask, render_template, request, redirect, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 import cloudinary
 import cloudinary.uploader
@@ -8,7 +8,6 @@ app = Flask(__name__)
 app.secret_key = "secret123"
 
 # DATABASE CONFIGURATION
-# Render లో మనం ఇచ్చే Environment Variable ని ఇక్కడ రీడ్ చేస్తుంది
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -31,14 +30,18 @@ class Document(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_name = db.Column(db.String(80), nullable=False)
     doc_name = db.Column(db.String(100), nullable=False)
-    file_url = db.Column(db.String(300), nullable=False) # Cloudinary URL
+    file_url = db.Column(db.String(300), nullable=False)
     public_id = db.Column(db.String(100), nullable=False)
     doc_password = db.Column(db.String(80), nullable=False)
 
 # --- ఈ సెక్షన్ నీ టేబుల్స్ ని ఆటోమేటిక్ గా క్రియేట్ చేస్తుంది ---
 with app.app_context():
-    # ఒకవేళ పాత టేబుల్స్ లో ఎర్రర్ ఉంటే వాటిని తీసేసి కొత్తవి క్రియేట్ చేస్తుంది
-    # నీకు "column user_id not found" రాకుండా ఇది కాపాడుతుంది
+    # పాత 'documents' టేబుల్ లో user_id ఎర్రర్ ఉంది కాబట్టి దాన్ని తీసేసి కొత్తది క్రియేట్ చేస్తున్నాం
+    db.session.execute(db.text('DROP TABLE IF EXISTS documents CASCADE;'))
+    db.session.execute(db.text('DROP TABLE IF EXISTS "user" CASCADE;'))
+    db.session.commit()
+    
+    # ఇప్పుడు పర్ఫెక్ట్ గా కొత్త టేబుల్స్ క్రియేట్ అవుతాయి
     db.create_all() 
 
 @app.route("/", methods=["GET", "POST"])
@@ -78,7 +81,6 @@ def dashboard():
         file = request.files["file"]
 
         if file:
-            # Cloudinary కి అప్‌లోడ్ చేయడం
             upload_result = cloudinary.uploader.upload(file)
             new_doc = Document(
                 user_name=session["user"],
@@ -107,7 +109,7 @@ def check_password():
 def delete(id):
     doc = Document.query.get(id)
     if doc:
-        cloudinary.uploader.destroy(doc.public_id) # Cloudinary నుండి డిలీట్ చేయడం
+        cloudinary.uploader.destroy(doc.public_id)
         db.session.delete(doc)
         db.session.commit()
     return redirect("/dashboard")
