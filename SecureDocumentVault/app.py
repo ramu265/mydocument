@@ -1,155 +1,121 @@
-from flask import Flask, render_template, request, redirect, session, send_from_directory, jsonify
-import sqlite3
+from flask import Flask, render_template, request, redirect, session, jsonify, send_from_directory
+from flask_sqlalchemy import SQLAlchemy
+import cloudinary
+import cloudinary.uploader
 import os
 
 app = Flask(__name__)
 app.secret_key = "secret123"
 
-UPLOAD_FOLDER = "static/uploads"
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+# DATABASE CONFIGURATION
+# Render లో మనం ఇచ్చే Environment Variable ని ఇక్కడ రీడ్ చేస్తుంది
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+db = SQLAlchemy(app)
 
-# DATABASE
-conn = sqlite3.connect("database.db", check_same_thread=False)
-cur = conn.cursor()
-
-cur.execute("""
-CREATE TABLE IF NOT EXISTS users(
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-username TEXT UNIQUE,
-password TEXT
+# CLOUDINARY CONFIGURATION
+cloudinary.config(
+    cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME'),
+    api_key = os.environ.get('CLOUDINARY_API_KEY'),
+    api_secret = os.environ.get('CLOUDINARY_API_SECRET')
 )
-""")
 
-cur.execute("""
-CREATE TABLE IF NOT EXISTS documents(
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-user TEXT,
-name TEXT,
-filename TEXT,
-password TEXT
-)
-""")
+# MODELS (Database Tables)
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password = db.Column(db.String(80), nullable=False)
 
-conn.commit()
+class Document(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_name = db.Column(db.String(80), nullable=False)
+    doc_name = db.Column(db.String(100), nullable=False)
+    file_url = db.Column(db.String(300), nullable=False) # Cloudinary URL
+    public_id = db.Column(db.String(100), nullable=False)
+    doc_password = db.Column(db.String(80), nullable=False)
 
+# --- ఈ సెక్షన్ నీ టేబుల్స్ ని ఆటోమేటిక్ గా క్రియేట్ చేస్తుంది ---
+with app.app_context():
+    # ఒకవేళ పాత టేబుల్స్ లో ఎర్రర్ ఉంటే వాటిని తీసేసి కొత్తవి క్రియేట్ చేస్తుంది
+    # నీకు "column user_id not found" రాకుండా ఇది కాపాడుతుంది
+    db.create_all() 
 
-@app.route("/", methods=["GET","POST"])
+@app.route("/", methods=["GET", "POST"])
 def login():
-
-    if request.method=="POST":
-
-        username=request.form["username"]
-        password=request.form["password"]
-
-        cur.execute("SELECT * FROM users WHERE username=? AND password=?",(username,password))
-        user=cur.fetchone()
-
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+        user = User.query.filter_by(username=username, password=password).first()
         if user:
-            session["user"]=username
+            session["user"] = username
             return redirect("/dashboard")
-
+        return "Invalid Login"
     return render_template("login.html")
 
-
-@app.route("/register", methods=["GET","POST"])
+@app.route("/register", methods=["GET", "POST"])
 def register():
-
-    if request.method=="POST":
-
-        username=request.form["username"]
-        password=request.form["password"]
-
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
         try:
-            cur.execute("INSERT INTO users(username,password) VALUES(?,?)",(username,password))
-            conn.commit()
+            new_user = User(username=username, password=password)
+            db.session.add(new_user)
+            db.session.commit()
             return redirect("/")
         except:
             return "User already exists"
-
     return render_template("register.html")
 
-
-@app.route("/dashboard", methods=["GET","POST"])
+@app.route("/dashboard", methods=["GET", "POST"])
 def dashboard():
-
     if "user" not in session:
         return redirect("/")
 
-    if request.method=="POST":
+    if request.method == "POST":
+        docname = request.form["docname"]
+        docpass = request.form["docpass"]
+        file = request.files["file"]
 
-        docname=request.form["docname"]
-        docpass=request.form["docpass"]
-        file=request.files["file"]
+        if file:
+            # Cloudinary కి అప్‌లోడ్ చేయడం
+            upload_result = cloudinary.uploader.upload(file)
+            new_doc = Document(
+                user_name=session["user"],
+                doc_name=docname,
+                file_url=upload_result['secure_url'],
+                public_id=upload_result['public_id'],
+                doc_password=docpass
+            )
+            db.session.add(new_doc)
+            db.session.commit()
 
-        filename=file.filename
-        filepath=os.path.join(app.config["UPLOAD_FOLDER"],filename)
-        file.save(filepath)
-
-        cur.execute("INSERT INTO documents(user,name,filename,password) VALUES(?,?,?,?)",
-        (session["user"],docname,filename,docpass))
-
-        conn.commit()
-
-    cur.execute("SELECT * FROM documents WHERE user=?",(session["user"],))
-    docs=cur.fetchall()
-
-    return render_template("dashboard.html",docs=docs)
-
+    docs = Document.query.filter_by(user_name=session["user"]).all()
+    return render_template("dashboard.html", docs=docs)
 
 @app.route("/check_password", methods=["POST"])
 def check_password():
+    docid = request.form["docid"]
+    entered_password = request.form["password"]
+    doc = Document.query.get(docid)
 
-    docid=request.form["docid"]
-    password=request.form["password"]
-
-    cur.execute("SELECT password, filename FROM documents WHERE id=?",(docid,))
-    data=cur.fetchone()
-
-    if data and data[0]==password:
-        return jsonify({"status":"success","file":data[1]})
-    else:
-        return jsonify({"status":"fail"})
-
-
-@app.route("/view/<filename>")
-def view_file(filename):
-
-    if "user" not in session:
-        return redirect("/")
-
-    return render_template("view_file.html",file=filename)
-
-
-@app.route("/download/<filename>")
-def download(filename):
-    return send_from_directory(app.config["UPLOAD_FOLDER"],filename,as_attachment=True)
-
+    if doc and doc.doc_password == entered_password:
+        return jsonify({"status": "success", "file": doc.file_url})
+    return jsonify({"status": "fail"})
 
 @app.route("/delete/<int:id>")
 def delete(id):
-
-    cur.execute("SELECT filename FROM documents WHERE id=?",(id,))
-    file=cur.fetchone()
-
-    if file:
-        path=os.path.join(app.config["UPLOAD_FOLDER"],file[0])
-        if os.path.exists(path):
-            os.remove(path)
-
-    cur.execute("DELETE FROM documents WHERE id=?",(id,))
-    conn.commit()
-
+    doc = Document.query.get(id)
+    if doc:
+        cloudinary.uploader.destroy(doc.public_id) # Cloudinary నుండి డిలీట్ చేయడం
+        db.session.delete(doc)
+        db.session.commit()
     return redirect("/dashboard")
-
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect("/")
 
-
-if __name__=="__main__":
+if __name__ == "__main__":
     app.run(debug=True)
